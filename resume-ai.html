@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resume AI Assessment System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c6aff;
+    --accent2: #ff6a8a;
+    --accent3: #6affd4;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --success: #6affd4;
+    --warn: #ffb86a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* noise overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  .glow-orb {
+    position: fixed; border-radius: 50%; filter: blur(120px); pointer-events: none; z-index: 0;
+  }
+  .orb1 { width: 500px; height: 500px; background: rgba(124,106,255,0.12); top: -100px; right: -100px; }
+  .orb2 { width: 400px; height: 400px; background: rgba(106,255,212,0.07); bottom: 100px; left: -100px; }
+
+  .container {
+    max-width: 900px; margin: 0 auto; padding: 40px 24px;
+    position: relative; z-index: 1;
+  }
+
+  /* Header */
+  header { margin-bottom: 48px; }
+  .logo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--text) 0%, var(--muted) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: var(--muted); font-size: 14px; font-weight: 300; }
+
+  /* API Key Bar */
+  .key-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 28px;
+  }
+  .key-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); flex-shrink: 0; }
+  .key-dot.connected { background: var(--success); }
+  .key-bar input {
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px;
+    flex: 1; min-width: 0;
+  }
+  .key-bar input::placeholder { color: var(--muted); }
+  .key-save {
+    background: var(--accent); color: #fff; border: none;
+    padding: 6px 16px; border-radius: 8px; font-size: 13px;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500;
+    transition: opacity .2s;
+    white-space: nowrap;
+  }
+  .key-save:hover { opacity: 0.85; }
+
+  /* Steps Layout */
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 600px) { .steps { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; inset: 0; border-radius: 16px;
+    background: linear-gradient(135deg, rgba(124,106,255,0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .card-label {
+    font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 14px; display: flex; align-items: center; gap-6px;
+  }
+  .card-label span { opacity: 0.5; margin-right: 6px; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 1.5px dashed rgba(124,106,255,0.3);
+    border-radius: 12px; padding: 28px 20px; text-align: center;
+    cursor: pointer; transition: all .2s; position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(124,106,255,0.05); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-text { color: var(--muted); font-size: 13px; }
+  .upload-text strong { color: var(--text); }
+  .file-name {
+    margin-top: 10px; padding: 6px 12px; background: rgba(106,255,212,0.1);
+    border-radius: 8px; font-size: 12px; color: var(--success);
+    display: none; word-break: break-all;
+  }
+  .file-name.show { display: block; }
+
+  /* JD textarea */
+  textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; line-height: 1.7; padding: 14px 16px; resize: vertical;
+    min-height: 160px; outline: none; transition: border-color .2s;
+  }
+  textarea:focus { border-color: rgba(124,106,255,0.5); }
+  textarea::placeholder { color: var(--muted); }
+
+  /* Analyze button */
+  .analyze-btn {
+    width: 100%; padding: 16px; border-radius: 14px; border: none;
+    background: linear-gradient(135deg, var(--accent) 0%, #9c6aff 100%);
+    color: #fff; font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 15px; letter-spacing: 0.5px; cursor: pointer;
+    transition: all .25s; margin-bottom: 28px; position: relative; overflow: hidden;
+  }
+  .analyze-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(124,106,255,0.35); }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .analyze-btn .shimmer {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+    transform: translateX(-100%); animation: shimmer 1.5s infinite;
+    display: none;
+  }
+  .analyze-btn.loading .shimmer { display: block; }
+  @keyframes shimmer { to { transform: translateX(100%); } }
+
+  /* Progress log */
+  .progress-log {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-bottom: 24px;
+    display: none; font-family: 'DM Mono', monospace; font-size: 13px;
+  }
+  .progress-log.show { display: block; }
+  .log-line { color: var(--muted); margin-bottom: 4px; transition: color .3s; }
+  .log-line.active { color: var(--accent3); }
+  .log-line.done { color: var(--success); }
+  .log-line::before { content: '▸ '; opacity: 0.5; }
+  .log-line.done::before { content: '✓ '; opacity: 1; color: var(--success); }
+
+  /* Result */
+  .result-section { display: none; }
+  .result-section.show { display: block; }
+
+  .score-hero {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 36px; text-align: center;
+    margin-bottom: 16px; position: relative; overflow: hidden;
+  }
+  .score-hero::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(124,106,255,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .verdict-badge {
+    display: inline-block; padding: 5px 16px; border-radius: 99px;
+    font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 20px;
+  }
+  .verdict-badge.strong { background: rgba(106,255,212,0.12); color: var(--success); border: 1px solid rgba(106,255,212,0.2); }
+  .verdict-badge.consider { background: rgba(255,184,106,0.12); color: var(--warn); border: 1px solid rgba(255,184,106,0.2); }
+  .verdict-badge.weak { background: rgba(255,106,138,0.12); color: var(--accent2); border: 1px solid rgba(255,106,138,0.2); }
+
+  .big-score {
+    font-family: 'Syne', sans-serif; font-size: 80px; font-weight: 800;
+    line-height: 1; margin-bottom: 8px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .score-label { color: var(--muted); font-size: 13px; }
+
+  /* Radar chart layout */
+  .radar-dims-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
+  @media (max-width: 600px) { .radar-dims-row { grid-template-columns: 1fr; } }
+  .radar-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; display: flex; flex-direction: column; align-items: center;
+  }
+  .radar-card canvas { width: 100% !important; max-width: 280px; }
+  .dims-grid { display: flex; flex-direction: column; gap: 12px; }
+  @media (max-width: 600px) { .dims-grid { } }
+
+  .dim-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px;
+  }
+  .dim-name { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .dim-score-row { display: flex; align-items: baseline; gap: 4px; margin-bottom: 8px; }
+  .dim-score { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 700; color: var(--text); }
+  .dim-max { font-size: 13px; color: var(--muted); }
+  .dim-bar-bg { height: 3px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .dim-bar { height: 100%; border-radius: 99px; transition: width 1s cubic-bezier(.22,1,.36,1); }
+  .dim-reason { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  .list-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .list-title {
+    font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .list-title.green { color: var(--success); }
+  .list-title.red { color: var(--accent2); }
+  .list-item {
+    font-size: 13px; color: var(--muted); padding: 6px 0;
+    border-bottom: 1px solid var(--border); display: flex; gap: 8px;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .list-item-dot { flex-shrink: 0; margin-top: 5px; width: 5px; height: 5px; border-radius: 50%; }
+  .list-item-dot.green { background: var(--success); }
+  .list-item-dot.red { background: var(--accent2); }
+
+  .recommend-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-bottom: 16px;
+  }
+  .recommend-label {
+    font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .recommend-text { color: var(--text); font-size: 14px; line-height: 1.8; }
+
+  .reset-btn {
+    width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif;
+    font-size: 14px; cursor: pointer; transition: all .2s;
+  }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .error-box {
+    background: rgba(255,106,138,0.08); border: 1px solid rgba(255,106,138,0.2);
+    border-radius: 12px; padding: 16px 20px; color: var(--accent2);
+    font-size: 13px; margin-bottom: 20px; display: none;
+  }
+  .error-box.show { display: block; }
+</style>
+</head>
+<body>
+<div class="glow-orb orb1"></div>
+<div class="glow-orb orb2"></div>
+
+<div class="container">
+  <header>
+    <div class="logo-row">
+      <div class="logo-icon">⚡</div>
+      <h1>Resume AI Assessment System</h1>
+    </div>
+    <p class="subtitle">Powered by Claude · Intelligent Parsing · Semantic Matching · Generate Assessment Reports</p>
+  </header>
+
+  <!-- API Key -->
+  <div class="key-bar">
+    <div class="key-dot" id="keyDot"></div>
+    <input type="password" id="apiKey" placeholder="Enter your Anthropic API Key (sk-ant-...)" />
+    <button class="key-save" onclick="saveKey()">Confirm</button>
+  </div>
+
+  <!-- Input cards -->
+  <div class="steps">
+    <!-- Resume upload -->
+    <div class="card">
+      <div class="card-label"><span>01</span> Upload Resume</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="resumeFile" accept=".pdf,.docx" onchange="onFileChange(this)">
+        <div class="upload-icon">📄</div>
+        <div class="upload-text"><strong>Click to Select File</strong><br>Supports PDF · DOCX</div>
+        <div class="file-name" id="fileName"></div>
+      </div>
+    </div>
+
+    <!-- JD input -->
+    <div class="card">
+      <div class="card-label"><span>02</span> Job Description (JD)</div>
+      <textarea id="jdText" placeholder="Paste job description, for example:&#10;&#10;Position: Python Backend Engineer&#10;Requirements:&#10;- 3+ years Python experience&#10;- Familiar with FastAPI / Django&#10;- Knowledge of MySQL, Redis&#10;- AI project experience preferred"></textarea>
+    </div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <button class="analyze-btn" id="analyzeBtn" onclick="analyze()">
+    <div class="shimmer"></div>
+    Start AI Assessment
+  </button>
+
+  <!-- Progress -->
+  <div class="progress-log" id="progressLog">
+    <div class="log-line" id="log1">Reading resume file...</div>
+    <div class="log-line" id="log2">Calling Claude to parse resume structure...</div>
+    <div class="log-line" id="log3">Parsing job description...</div>
+    <div class="log-line" id="log4">Performing semantic matching and scoring...</div>
+    <div class="log-line" id="log5">Generating assessment report...</div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-section" id="resultSection">
+    <!-- Score hero -->
+    <div class="score-hero">
+      <div class="verdict-badge" id="verdictBadge"></div>
+      <div class="big-score" id="bigScore">--</div>
+      <div class="score-label">Overall Matching Score (Max 100)</div>
+    </div>
+
+    <!-- Radar + Dimensions -->
+    <div class="radar-dims-row">
+      <div class="radar-card">
+        <canvas id="radarChart"></canvas>
+      </div>
+      <div class="dims-grid" id="dimsGrid"></div>
+    </div>
+
+    <!-- Strengths & Gaps -->
+    <div class="two-col">
+      <div class="list-card">
+        <div class="list-title green">Candidate Strengths</div>
+        <div id="strengthsList"></div>
+      </div>
+      <div class="list-card">
+        <div class="list-title red">Areas for Improvement</div>
+        <div id="gapsList"></div>
+      </div>
+    </div>
+
+    <!-- Recommendation -->
+    <div class="recommend-card">
+      <div class="recommend-label">Comprehensive Recommendation</div>
+      <div class="recommend-text" id="recommendText"></div>
+    </div>
+
+    <button class="reset-btn" onclick="reset()">Re-Evaluate</button>
+  </div>
+</div>
+
+<script>
+let apiKey = '';
+let resumeContent = '';
+let radarChartInstance = null;
+
+function saveKey() {
+  apiKey = document.getElementById('apiKey').value.trim();
+  if (apiKey.startsWith('sk-ant-')) {
+    document.getElementById('keyDot').classList.add('connected');
+  } else {
+    showError('Invalid API Key format, should start with sk-ant-');
+  }
+}
+
+function onFileChange(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fn = document.getElementById('fileName');
+  fn.textContent = file.name;
+  fn.classList.add('show');
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    if (file.name.endsWith('.docx')) {
+      try {
+        const { value } = await mammoth.extractRawText({ arrayBuffer: e.target.result });
+        resumeContent = value;
+      } catch (err) {
+        resumeContent = '[Failed to parse DOCX, please use PDF instead]';
+      }
+    } else {
+      const bytes = new Uint8Array(e.target.result);
+      let binary = '';
+      for (let b of bytes) binary += String.fromCharCode(b);
+      resumeContent = btoa(binary);
+      resumeContent = '__PDF__' + resumeContent;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showError(msg) {
+  const box = document.getElementById('errorBox');
+  box.textContent = msg;
+  box.classList.add('show');
+}
+function clearError() {
+  document.getElementById('errorBox').classList.remove('show');
+}
+
+function setLog(id, state) {
+  const el = document.getElementById(id);
+  el.className = 'log-line ' + state;
+}
+
+async function callClaude(messages, systemPrompt) {
+  const body = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2000,
+    system: systemPrompt,
+    messages
+  };
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error?.message || 'API call failed');
+  }
+  const data = await resp.json();
+  return data.content[0].text;
+}
+
+async function parseResumeWithClaude(content) {
+  const isPDF = content.startsWith('__PDF__');
+  const systemPrompt = `You are a resume parsing assistant. Output only valid JSON, no other text, explanations or markdown.`;
+
+  let messages;
+  if (isPDF) {
+    const base64 = content.replace('__PDF__', '');
+    messages = [{
+      role: 'user',
+      content: [
+        {
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: base64 }
+        },
+        {
+          type: 'text',
+          text: `Please parse this resume into the following JSON structure:
+{
+  "name": "name",
+  "contact": {"email": "", "phone": ""},
+  "education": [{"school": "", "degree": "", "major": "", "year": ""}],
+  "experience": [{"company": "", "title": "", "duration": "", "highlights": []}],
+  "skills": [],
+  "summary": "one-sentence background summary"
+}
+Output only JSON, no other content.`
+        }
+      ]
+    }];
+  } else {
+    messages = [{
+      role: 'user',
+      content: `Please parse the following resume text into JSON:
+{
+  "name": "name",
+  "contact": {"email": "", "phone": ""},
+  "education": [{"school": "", "degree": "", "major": "", "year": ""}],
+  "experience": [{"company": "", "title": "", "duration": "", "highlights": []}],
+  "skills": [],
+  "summary": "one-sentence background summary"
+}
+Output only JSON.
+
+Resume content:
+${content}`
+    }];
+  }
+  const raw = await callClaude(messages, systemPrompt);
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+async function parseJD(jdText) {
+  const systemPrompt = `You are a job description analysis assistant. Output only valid JSON, no other text.`;
+  const messages = [{
+    role: 'user',
+    content: `Please parse the following JD into JSON:
+{
+  "title": "",
+  "must_have": [],
+  "nice_to_have": [],
+  "responsibilities": [],
+  "experience_years": "",
+  "education": ""
+}
+Output only JSON.
+
+JD:
+${jdText}`
+  }];
+  const raw = await callClaude(messages, systemPrompt);
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+async function matchAndReport(resume, jd) {
+  const systemPrompt = `You are a professional recruitment consultant. Output only valid JSON, no other text.`;
+  const messages = [{
+    role: 'user',
+    content: `Based on resume and JD, output matching assessment JSON:
+{
+  "overall_score": 85,
+  "dimensions": {
+    "skill_match": {"score": 0, "reason": ""},
+    "experience_match": {"score": 0, "reason": ""},
+    "education_match": {"score": 0, "reason": ""}
+  },
+  "strengths": [],
+  "gaps": [],
+  "recommendation": "",
+  "verdict": "strongly recommended"
+}
+verdict can only be one of: strongly recommended, consider, not a good fit. Output only JSON.
+
+Resume: ${JSON.stringify(resume, null, 2)}
+
+JD: ${JSON.stringify(jd, null, 2)}`
+  }];
+  const raw = await callClaude(messages, systemPrompt);
+  return JSON.parse(raw.replace(/```json|```/g, '').trim());
+}
+
+async function analyze() {
+  clearError();
+  if (!apiKey) { showError('Please enter and confirm your API Key first'); return; }
+  if (!resumeContent) { showError('Please upload a resume file first'); return; }
+  if (!document.getElementById('jdText').value.trim()) { showError('Please enter a job description'); return; }
+
+  const jdText = document.getElementById('jdText').value.trim();
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.textContent = 'Analyzing...';
+
+  document.getElementById('progressLog').classList.add('show');
+  document.getElementById('resultSection').classList.remove('show');
+
+  ['log1','log2','log3','log4','log5'].forEach(id => {
+    document.getElementById(id).className = 'log-line';
+  });
+
+  try {
+    setLog('log1', 'active');
+    await sleep(400);
+    setLog('log1', 'done');
+
+    setLog('log2', 'active');
+    const resumeData = await parseResumeWithClaude(resumeContent);
+    setLog('log2', 'done');
+
+    setLog('log3', 'active');
+    const jdData = await parseJD(jdText);
+    setLog('log3', 'done');
+
+    setLog('log4', 'active');
+    const result = await matchAndReport(resumeData, jdData);
+    setLog('log4', 'done');
+
+    setLog('log5', 'active');
+    await sleep(300);
+    setLog('log5', 'done');
+
+    renderResult(result);
+  } catch (err) {
+    showError('Error: ' + err.message);
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.textContent = 'Start AI Assessment';
+  }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function renderResult(result) {
+  document.getElementById('bigScore').textContent = result.overall_score;
+
+  const vb = document.getElementById('verdictBadge');
+  vb.textContent = result.verdict;
+  vb.className = 'verdict-badge';
+  if (result.verdict === 'strongly recommended') vb.classList.add('strong');
+  else if (result.verdict === 'consider') vb.classList.add('consider');
+  else vb.classList.add('weak');
+
+  const dims = result.dimensions;
+  const labels = Object.keys(dims);
+  const scores = labels.map(k => dims[k].score);
+
+  if (radarChartInstance) radarChartInstance.destroy();
+  const ctx = document.getElementById('radarChart').getContext('2d');
+  radarChartInstance = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Match Rate',
+        data: scores,
+        backgroundColor: 'rgba(124,106,255,0.15)',
+        borderColor: '#7c6aff',
+        borderWidth: 2,
+        pointBackgroundColor: ['#7c6aff','#ff6a8a','#6affd4'],
+        pointBorderColor: '#0a0a0f',
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      animation: { duration: 900, easing: 'easeOutQuart' },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: {
+            stepSize: 25,
+            color: 'rgba(255,255,255,0.2)',
+            font: { size: 10 },
+            backdropColor: 'transparent'
+          },
+          grid: { color: 'rgba(255,255,255,0.07)' },
+          angleLines: { color: 'rgba(255,255,255,0.07)' },
+          pointLabels: {
+            color: '#6b6b80',
+            font: { size: 12, family: "'DM Sans', sans-serif" }
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a1a26',
+          borderColor: 'rgba(255,255,255,0.07)',
+          borderWidth: 1,
+          titleColor: '#e8e8f0',
+          bodyColor: '#6b6b80',
+          callbacks: { label: ctx => ` ${ctx.raw} pts` }
+        }
+      }
+    }
+  });
+
+  const grid = document.getElementById('dimsGrid');
+  grid.innerHTML = '';
+  labels.forEach((name, i) => {
+    const val = dims[name];
+    const color = ['#7c6aff','#ff6a8a','#6affd4'][i] || '#7c6aff';
+    grid.innerHTML += `
+      <div class="dim-card">
+        <div class="dim-name">${name}</div>
+        <div class="dim-score-row">
+          <div class="dim-score">${val.score}</div>
+          <div class="dim-max">/100</div>
+        </div>
+        <div class="dim-bar-bg">
+          <div class="dim-bar" style="width:0%;background:${color}" data-w="${val.score}%"></div>
+        </div>
+        <div class="dim-reason">${val.reason}</div>
+      </div>`;
+  });
+
+  setTimeout(() => {
+    document.querySelectorAll('.dim-bar').forEach(b => { b.style.width = b.dataset.w; });
+  }, 100);
+
+  const sl = document.getElementById('strengthsList');
+  sl.innerHTML = (result.strengths || []).map(s => `
+    <div class="list-item">
+      <div class="list-item-dot green"></div>
+      <span>${s}</span>
+    </div>`).join('');
+
+  const gl = document.getElementById('gapsList');
+  gl.innerHTML = (result.gaps || []).map(g => `
+    <div class="list-item">
+      <div class="list-item-dot red"></div>
+      <span>${g}</span>
+    </div>`).join('');
+
+  document.getElementById('recommendText').textContent = result.recommendation;
+
+  document.getElementById('resultSection').classList.add('show');
+  document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.textContent = 'Start AI Assessment';
+}
+
+function reset() {
+  document.getElementById('resultSection').classList.remove('show');
+  document.getElementById('progressLog').classList.remove('show');
+  document.getElementById('resumeFile').value = '';
+  document.getElementById('fileName').classList.remove('show');
+  document.getElementById('jdText').value = '';
+  resumeContent = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+
+<!-- Chart.js for radar -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Mammoth for DOCX parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+</body>
+</html>
